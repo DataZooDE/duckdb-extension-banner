@@ -182,6 +182,14 @@ void TestBoxRendering() {
 	}
 	Check(has_issues, "banner shows the issues url");
 	Check(has_optout, "banner tells the user how to silence it");
+
+	// A CLI has no SET command, so telling a shell user to run one would be an
+	// instruction they cannot follow.
+	bool standalone_mentions_set = false;
+	for (const std::string &line : datazoo::BannerLines(kInfo, /* has_set_option = */ false)) {
+		standalone_mentions_set |= line.find("SET datazoo_banner") != std::string::npos;
+	}
+	Check(!standalone_mentions_set, "standalone banner does not advertise a SET option");
 	Check(datazoo::banner_detail::DisplayWidth("abc") == 3, "ascii width");
 	Check(datazoo::banner_detail::DisplayWidth("\xE2\x98\x85") == 1, "star counts as one column");
 }

@@ -293,7 +293,10 @@ inline bool BannerSuppressed() {
 	return false;
 }
 
-inline std::vector<std::string> BannerLines(const BannerInfo &info) {
+// `has_set_option` distinguishes the two surfaces: inside DuckDB there is a SET
+// knob to advertise, in a CLI or server there is not, and telling a shell user
+// to run SET would be an instruction they cannot follow.
+inline std::vector<std::string> BannerLines(const BannerInfo &info, bool has_set_option = true) {
 	const bool unicode = banner_detail::UseUnicodeFrame();
 	const char *star = unicode ? "\xE2\x98\x85" : "*";
 
@@ -306,7 +309,8 @@ inline std::vector<std::string> BannerLines(const BannerInfo &info) {
 	lines.push_back(std::string(star) + " If it saved you time, a star helps others find it:");
 	lines.push_back("  " + std::string(info.repo));
 	lines.push_back("");
-	lines.push_back("(silence this: SET datazoo_banner=false, or DATAZOO_NO_BANNER=1)");
+	lines.push_back(has_set_option ? "(silence this: SET datazoo_banner=false, or DATAZOO_NO_BANNER=1)"
+	                               : "(silence this: DATAZOO_NO_BANNER=1)");
 	return lines;
 }
 
@@ -360,7 +364,8 @@ inline void ShowBannerStandalone(const BannerInfo &info, bool machine_readable =
 		}
 		shown_this_process = true;
 	}
-	banner_detail::RenderBox(BannerLines(info), stderr);
+	// No SET knob outside DuckDB, so the banner must not advertise one.
+	banner_detail::RenderBox(BannerLines(info, /* has_set_option = */ false), stderr);
 	banner_detail::TouchStamp(stamp);
 	banner_detail::ReportBannerShown(info, "process_start");
 }
