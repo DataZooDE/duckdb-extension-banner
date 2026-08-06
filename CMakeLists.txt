@@ -23,6 +23,15 @@ if(DATAZOO_BANNER_TELEMETRY)
     target_compile_definitions(datazoo_banner INTERFACE DATAZOO_BANNER_TELEMETRY)
 endif()
 
+# DuckDB installs its extension targets through an export set, and CMake refuses
+# to export a target that links something outside that set — even a header-only
+# INTERFACE library that contributes nothing but an include path. Joining the
+# set is what lets a consumer just link `datazoo_banner` like any other target.
+# Same treatment posthog-telemetry gives itself.
+if(DEFINED DUCKDB_EXPORT_SET)
+    install(TARGETS datazoo_banner EXPORT "${DUCKDB_EXPORT_SET}")
+endif()
+
 option(DATAZOO_BANNER_BUILD_TESTS "Build the banner gating tests" OFF)
 if(DATAZOO_BANNER_BUILD_TESTS)
     enable_testing()
