@@ -122,6 +122,19 @@ Added as a submodule, exactly like `posthog-telemetry`:
 git submodule add https://github.com/DataZooDE/duckdb-extension-banner.git third_party/datazoo-banner
 ```
 
+## Keeping consumers in sync
+
+A fix here only helps the repos that bump their submodule. When some do and some do not, the stale
+ones fail in CI for a reason that looks like a bug in their own code — that is exactly how
+`DBConfig::HasExtensionOption` (absent from DuckDB's 1.4 LTS line) took down erpl-idoc's LTS jobs
+after erpl-tunnel had already been fixed.
+
+```bash
+./check-consumer-pins.sh            # scans sibling repos, flags stale pins
+```
+
+Run it after landing anything here, and bump the flagged repos before assuming the fix is live.
+
 ## License
 
 MIT — this is call-to-action copy, not product IP, and it should be trivially vendorable.
