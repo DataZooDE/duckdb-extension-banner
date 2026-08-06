@@ -12,7 +12,27 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <string>
+
+// The header is portable; this test's fd juggling and env manipulation are not,
+// so the POSIX spellings are mapped rather than the test being skipped on
+// Windows — the gating rules are exactly what we want covered there too.
+#ifdef _WIN32
+#include <io.h>
+#define dup _dup
+#define dup2 _dup2
+#define close _close
+#define open _open
+#define lseek _lseek
+using off_t = long;
+static int setenv(const char *name, const char *value, int) {
+	return _putenv_s(name, value);
+}
+static int unsetenv(const char *name) {
+	return _putenv_s(name, "");
+}
+#else
 #include <unistd.h>
+#endif
 
 namespace {
 
