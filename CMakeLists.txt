@@ -13,7 +13,16 @@ target_include_directories(datazoo_banner INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_compile_features(datazoo_banner INTERFACE cxx_std_17)
+# Deliberately NOT target_compile_features(... INTERFACE cxx_std_17).
+#
+# The header needs C++17, but every consumer already builds at C++17, so stating
+# the requirement buys nothing and costs a link error. An INTERFACE cxx_std_17
+# propagates through the extension target into DuckDB's own tools/plan_serializer,
+# which then compiles as C++17 while libduckdb_static stays C++11. In that split,
+# BufferedFileWriter::DEFAULT_OPEN_FLAGS -- a static constexpr member with a
+# deprecated out-of-line definition -- is COMDAT-weak on one side and strong on
+# the other, and the link fails with a multiple definition error. posthog-telemetry
+# hit exactly this; anofox-statistics CI hit it again through this library.
 
 # Opt-in: when set, the banner reports a `banner_shown` event through the
 # consumer's posthog-telemetry instance. Requires telemetry.hpp on the include

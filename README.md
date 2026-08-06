@@ -122,6 +122,20 @@ Added as a submodule, exactly like `posthog-telemetry`:
 git submodule add https://github.com/DataZooDE/duckdb-extension-banner.git third_party/datazoo-banner
 ```
 
+## Why there is no `INTERFACE cxx_std_17`
+
+The headers need C++17, and stating that with `target_compile_features(... INTERFACE cxx_std_17)`
+is the obvious thing to do. It breaks the build.
+
+The requirement propagates through the extension target into DuckDB's own
+`tools/plan_serializer`, which then compiles as C++17 while `libduckdb_static` stays C++11. In that
+split `BufferedFileWriter::DEFAULT_OPEN_FLAGS` — a `static constexpr` member with a deprecated
+out-of-line definition — is COMDAT-weak on one side and a strong symbol on the other, and the link
+dies with `multiple definition`. posthog-telemetry hit this; this library then hit it again in
+anofox-statistics CI.
+
+Every consumer already builds at C++17, so the declaration buys nothing. Leave it out.
+
 ## Keeping consumers in sync
 
 A fix here only helps the repos that bump their submodule. When some do and some do not, the stale
