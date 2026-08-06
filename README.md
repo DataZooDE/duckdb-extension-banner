@@ -84,10 +84,21 @@ or `--help` output.
 
 ## Telemetry
 
-Building with `-DDATAZOO_BANNER_TELEMETRY=ON` (and `telemetry.hpp` on the include path) emits a
+Building with `-DDATAZOO_BANNER_TELEMETRY=ON` emits a
 `banner_shown` event when a banner actually prints, so the event count is an impression count. It
 rides the extension's existing telemetry consent: if the user disabled telemetry, nothing is sent.
 Without the flag the code is compiled out entirely.
+
+`telemetry.hpp` has to be reachable from the translation units that include the banner header. Many
+repos link `posthog_telemetry` as `PRIVATE`, in which case its include path does *not* reach them —
+point `DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR` at the directory instead:
+
+```cmake
+set(DATAZOO_BANNER_TELEMETRY ON CACHE BOOL "" FORCE)
+set(DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR
+    ${CMAKE_SOURCE_DIR}/third_party/posthog-telemetry/include CACHE PATH "" FORCE)
+add_subdirectory(third_party/datazoo-banner)
+```
 
 ## Build and test
 

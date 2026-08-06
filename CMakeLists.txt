@@ -19,8 +19,20 @@ target_compile_features(datazoo_banner INTERFACE cxx_std_17)
 # consumer's posthog-telemetry instance. Requires telemetry.hpp on the include
 # path, which every DataZoo repo already has via its own submodule.
 option(DATAZOO_BANNER_TELEMETRY "Emit a banner_shown event via posthog-telemetry" OFF)
+
+# Where telemetry.hpp lives. Consumers link posthog_telemetry PRIVATE often
+# enough that its include path does not reach the translation units including
+# this header -- erpl-adt hit exactly that. Setting this carries the path on the
+# banner's own INTERFACE, so switching telemetry on stays a one-liner per repo.
+set(DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR "" CACHE PATH
+    "Directory containing telemetry.hpp; needed only with DATAZOO_BANNER_TELEMETRY=ON")
+
 if(DATAZOO_BANNER_TELEMETRY)
     target_compile_definitions(datazoo_banner INTERFACE DATAZOO_BANNER_TELEMETRY)
+    if(DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR)
+        target_include_directories(datazoo_banner INTERFACE
+            ${DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR})
+    endif()
 endif()
 
 # DuckDB installs its extension targets through an export set, and CMake refuses
