@@ -1,0 +1,29 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cpp:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DDATAZOO_BANNER_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --config Release
+      # CI sets GITHUB_ACTIONS, so this also proves the CI suppression path:
+      # the tests assert no bytes reach stderr.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --manifest-path rust/datazoo-banner/Cargo.toml

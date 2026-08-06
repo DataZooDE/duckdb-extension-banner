@@ -1,0 +1,9 @@
+[package]
+name = "datazoo-banner"
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+description = "Issue-link footers for DataZoo DuckDB extensions written in Rust"
+repository = "https://github.com/DataZooDE/duckdb-extension-banner"
+
+[dependencies]
