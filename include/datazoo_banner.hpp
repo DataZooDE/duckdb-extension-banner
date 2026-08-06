@@ -232,7 +232,11 @@ inline void RenderBox(const std::vector<std::string> &lines, FILE *out) {
 // sent. Compiled out entirely unless the consumer defines the macro.
 inline void ReportBannerShown(const BannerInfo &info, const char *surface) {
 #ifdef DATAZOO_BANNER_TELEMETRY
-	auto &telemetry = PostHogTelemetry::Instance();
+	// posthog-telemetry declares PostHogTelemetry inside namespace duckdb, even
+	// though the class itself is DuckDB-agnostic. Qualify explicitly rather than
+	// pulling the namespace in - this header is also included by erpl-adt and
+	// flapi, where `using namespace duckdb` would be wrong.
+	auto &telemetry = ::duckdb::PostHogTelemetry::Instance();
 	if (!telemetry.IsEnabled()) {
 		return;
 	}
