@@ -78,9 +78,13 @@ struct GuardedFunction<RETURN(ARGS...), FN, INFO> {
 inline void RegisterBannerOption(duckdb::ExtensionLoader &loader) {
 	auto &instance = loader.GetDatabaseInstance();
 	auto &config = duckdb::DBConfig::GetConfig(instance);
-	if (config.HasExtensionOption("datazoo_banner")) {
-		return;
-	}
+	// Registered unconditionally, even when several DataZoo extensions load into
+	// one database. AddExtensionOption overwrites the option *definition* but
+	// leaves an already-set value alone (it checks IsSet before applying the
+	// default), so a user who set datazoo_banner=false keeps that setting when
+	// the next extension loads. The obvious guard -- HasExtensionOption -- was
+	// tried and reverted: it does not exist in the 1.4 LTS line, which several
+	// repos still build against.
 	config.AddExtensionOption("datazoo_banner",
 	                          "Show the DataZoo feedback banner when an extension is loaded in an "
 	                          "interactive terminal (at most once a day per extension).",
