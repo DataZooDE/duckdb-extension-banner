@@ -120,15 +120,30 @@ void TestSilentWhenNotATty() {
 	ClearEnvironment();
 	std::fflush(stderr);
 
-	const std::string path =
-	    std::string(std::getenv("TMPDIR") != nullptr ? std::getenv("TMPDIR") : "/tmp") +
-	    "/datazoo_banner_test_stderr";
+	// Windows has no /tmp, and an unopenable path here would leave the fd
+	// juggling below operating on -1 rather than reporting a clean failure.
+	std::string temp_dir;
+	for (const char *candidate : {"TMPDIR", "TEMP", "TMP"}) {
+		const char *value = std::getenv(candidate);
+		if (value != nullptr && value[0] != '\0') {
+			temp_dir = value;
+			break;
+		}
+	}
+	if (temp_dir.empty()) {
+		temp_dir = "/tmp";
+	}
+	const std::string path = temp_dir + "/datazoo_banner_test_stderr";
 
 	// dup the real stderr aside rather than freopen-ing it back: the test also
 	// runs where /dev/tty cannot be opened, and losing stderr there would make
 	// any subsequent failure invisible.
 	const int saved = dup(fileno(stderr));
 	const int sink = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (sink < 0 || saved < 0) {
+		Check(false, "could not redirect stderr for the tty test");
+		return;
+	}
 	dup2(sink, fileno(stderr));
 
 	datazoo::ShowBanner(kInfo);
