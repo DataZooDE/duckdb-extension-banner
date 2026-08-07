@@ -23,7 +23,6 @@
 #define close _close
 #define open _open
 #define lseek _lseek
-using off_t = long;
 static int setenv(const char *name, const char *value, int) {
 	return _putenv_s(name, value);
 }
@@ -150,7 +149,11 @@ void TestSilentWhenNotATty() {
 	datazoo::ShowBannerStandalone(kInfo);
 	std::fflush(stderr);
 
-	const off_t written = lseek(sink, 0, SEEK_END);
+	// long long rather than off_t: the banner header now includes <sys/types.h>
+	// on every platform, and MinGW defines off_t there -- re-aliasing it here
+	// would be a conflicting redefinition on exactly the toolchain this test is
+	// meant to protect.
+	const long long written = static_cast<long long>(lseek(sink, 0, SEEK_END));
 	dup2(saved, fileno(stderr));
 	close(sink);
 	close(saved);
