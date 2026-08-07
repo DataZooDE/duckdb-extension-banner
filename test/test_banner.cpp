@@ -190,6 +190,20 @@ void TestBoxRendering() {
 		standalone_mentions_set |= line.find("SET datazoo_banner") != std::string::npos;
 	}
 	Check(!standalone_mentions_set, "standalone banner does not advertise a SET option");
+	// Regression guard for the MinGW break: StampIsFresh must compile and work
+	// wherever the stamp lives. On MinGW the `struct _stat64` tag hides the
+	// function of the same name in C++, so the original _stat64 call parsed as a
+	// constructor and every rtools/MinGW Windows build in the fleet failed. This
+	// exercises the same code path the compiler chokes on.
+	{
+		const std::string probe = datazoo::banner_detail::StampPath("banner_stat_probe");
+		std::remove(probe.c_str());
+		Check(!datazoo::banner_detail::StampIsFresh(probe, 3600), "absent stamp reads as stale");
+		datazoo::banner_detail::TouchStamp(probe);
+		Check(datazoo::banner_detail::StampIsFresh(probe, 3600), "written stamp reads as fresh");
+		std::remove(probe.c_str());
+	}
+
 	Check(datazoo::banner_detail::DisplayWidth("abc") == 3, "ascii width");
 	Check(datazoo::banner_detail::DisplayWidth("\xE2\x98\x85") == 1, "star counts as one column");
 }

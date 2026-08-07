@@ -23,12 +23,15 @@
 #include <string>
 #include <vector>
 
+// <sys/stat.h> is needed on every platform, Windows included: MinGW uses plain
+// stat() there (see StampIsFresh for why _stat64 cannot be called from C++).
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
 #else
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 #endif
 
@@ -149,7 +152,13 @@ inline bool StampIsFresh(const std::string &path, long ttl_seconds) {
 	if (path.empty()) {
 		return false;
 	}
-#ifdef _WIN32
+	// MSVC gets _stat64 for a 64-bit mtime. MinGW deliberately does not: there
+	// the `struct _stat64` tag hides the function of the same name in C++, so
+	// `_stat64(path, &info)` is parsed as a constructor call and fails with
+	// "no matching function for call to '_stat64::_stat64'". Plain stat() has
+	// no such collision and is accurate to the second, which is all a 24-hour
+	// TTL needs.
+#if defined(_WIN32) && defined(_MSC_VER)
 	struct _stat64 info;
 	if (_stat64(path.c_str(), &info) != 0) {
 		return false;
