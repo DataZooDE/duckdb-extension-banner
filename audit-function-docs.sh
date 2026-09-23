@@ -19,6 +19,9 @@
 #   --artifact PATH      Load this built file instead of the installed extension.
 #                        Always prefer this in CI: the installed copy is the PREVIOUS
 #                        release, so auditing it silently measures the wrong binary.
+#   --preload "a b"      Extra extensions to LOAD before the baseline snapshot, for
+#                        dependencies beyond the common autoload set. If the report warns
+#                        UNEXPECTED_AUTOLOAD, that names exactly what to pass here.
 #   --exemptions PATH    Default: ./function-docs-exemptions.json
 #   --check-examples     Validate every example (see "Checking examples" below).
 #   --json PATH          Also write one JSON object for the fleet roll-up.
@@ -43,6 +46,7 @@ set -uo pipefail
 EXT=""
 ARTIFACT=""
 EXEMPTIONS="function-docs-exemptions.json"
+EXTRA_PRELOAD=""
 CHECK_EXAMPLES=0
 JSON_OUT=""
 DUCKDB_BIN="${DUCKDB_BIN:-duckdb}"
@@ -51,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --extension)   EXT="$2"; shift 2 ;;
         --artifact)    ARTIFACT="$2"; shift 2 ;;
+        --preload)     EXTRA_PRELOAD="$2"; shift 2 ;;
         --exemptions)  EXEMPTIONS="$2"; shift 2 ;;
         --check-examples) CHECK_EXAMPLES=1; shift ;;
         --json)        JSON_OUT="$2"; shift 2 ;;
@@ -96,6 +101,9 @@ fi
 # stale preload list rather than silently inflating the total.
 # ---------------------------------------------------------------------------
 PRELOAD="INSTALL json; LOAD json; INSTALL parquet; LOAD parquet; LOAD core_functions;"
+for _ext in $EXTRA_PRELOAD; do
+    PRELOAD="$PRELOAD INSTALL ${_ext}; LOAD ${_ext};"
+done
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
