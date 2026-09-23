@@ -1,5 +1,19 @@
 # duckdb-extension-banner
 
+The shared support kit for DataZoo DuckDB extensions. It is a submodule of all 17 of
+them, which is why new cross-cutting helpers land here rather than in a new repo nobody
+would remember to vendor. The banner was the first inhabitant and gave the repo its name.
+
+| | |
+|---|---|
+| `include/datazoo_banner*.hpp` | the feedback banner (below) |
+| `include/datazoo_function_doc.hpp` | helpers for registering functions that document themselves — see [docs/FUNCTION_DOCS.md](docs/FUNCTION_DOCS.md) |
+| `audit-function-docs.sh` | report-only `duckdb_functions()` coverage audit for one extension |
+| `fleet-doc-report.sh` | worst-first coverage ranking across every extension |
+| `check-consumer-pins.sh` | which consumers pin an out-of-date commit of this repo |
+
+## The banner
+
 A one-per-day, terminal-only feedback nudge for DataZoo DuckDB extensions and CLIs.
 
 When someone loads one of our extensions in an interactive DuckDB shell, they see this once a day:
