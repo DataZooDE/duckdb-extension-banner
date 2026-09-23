@@ -209,11 +209,12 @@ if [[ "$CHECK_EXAMPLES" == "1" ]]; then
         [[ -z "$example" ]] && continue
         EX_TOTAL=$((EX_TOTAL + 1))
 
-        # Scalar and aggregate examples are conventionally bare expressions; wrap them
-        # so they are parseable statements.
+        # Scalar, aggregate and scalar-macro examples are conventionally bare
+        # expressions; wrap them so they are parseable statements. A table macro's
+        # example is already a full SELECT, which the guard below detects.
         stmt="$example"
         case "$ftype" in
-            scalar|aggregate)
+            scalar|aggregate|macro)
                 [[ "$stmt" =~ ^[[:space:]]*(SELECT|WITH|PRAGMA|CALL|EXPLAIN) ]] || stmt="SELECT $stmt"
                 ;;
         esac
