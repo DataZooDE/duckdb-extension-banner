@@ -4,7 +4,19 @@
 # An AI agent connected to a DuckDB database can only learn what an extension does by
 # querying duckdb_functions(). A README is not reachable from a SQL connection. This
 # script measures what that agent would actually see: description, examples, real
-# parameter names (not col0) and categories, per registered function.
+# parameter names (not col0/col1/...) and categories, per registered function.
+#
+# Placeholder detection matches ANY colN, not just col0. DuckDB fills parameter_names
+# positionally and pads the shortfall, so a function whose names cover only its first
+# three arguments renders as (a, b, c, col3, col4, ...) -- documented at the front,
+# placeholders at the back. Matching col0 alone silently passes exactly that case,
+# which is how anofox_tab_outlier_tree's 9-argument overload went unnoticed.
+#
+# Spelled as an explicit list rather than a regex over a lambda on purpose. The
+# `->` lambda arrow is deprecated and DuckDB prints a warning for it on STDOUT,
+# which lands in this report and cost the STATS row entirely; the replacement
+# `lambda x:` syntax is not available on the 1.4.5 LTS CLI some of these repos
+# audit against. A literal list works everywhere and says exactly what it means.
 #
 # It is REPORT-ONLY and always exits 0. Failing a build on missing prose would only
 # teach people to write filler; the countermeasure to drift is that the numbers are
@@ -175,7 +187,7 @@ SELECT '::STATS::'
     || '|' || count(*) FILTER (description IS NOT NULL AND description <> '')
     || '|' || count(*) FILTER (len(examples) > 0)
     || '|' || count(*) FILTER (len(categories) > 0)
-    || '|' || count(*) FILTER (list_contains(parameters, 'col0'))
+    || '|' || count(*) FILTER (list_has_any(parameters, ['col0', 'col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9', 'col10', 'col11', 'col12', 'col13', 'col14', 'col15', 'col16', 'col17', 'col18', 'col19', 'col20', 'col21', 'col22', 'col23', 'col24', 'col25', 'col26', 'col27', 'col28', 'col29', 'col30', 'col31', 'col32', 'col33', 'col34', 'col35', 'col36', 'col37', 'col38', 'col39']))
     || '|' || count(*) FILTER (exempt_kind IS NULL
                                AND (description IS NULL OR description = ''))
     || '|' || count(*) FILTER (exempt_kind IS NULL)
@@ -185,13 +197,13 @@ FROM _classified;
 SELECT '::GAP::' || function_type || '|' || function_name
     || '|' || CASE WHEN description IS NULL OR description = '' THEN 'no-description' ELSE 'ok' END
     || '|' || CASE WHEN len(examples) = 0 THEN 'no-example' ELSE 'ok' END
-    || '|' || CASE WHEN list_contains(parameters, 'col0') THEN 'col0-params' ELSE 'ok' END
+    || '|' || CASE WHEN list_has_any(parameters, ['col0', 'col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9', 'col10', 'col11', 'col12', 'col13', 'col14', 'col15', 'col16', 'col17', 'col18', 'col19', 'col20', 'col21', 'col22', 'col23', 'col24', 'col25', 'col26', 'col27', 'col28', 'col29', 'col30', 'col31', 'col32', 'col33', 'col34', 'col35', 'col36', 'col37', 'col38', 'col39']) THEN 'colN-params' ELSE 'ok' END
     || '|' || CASE WHEN len(categories) = 0 THEN 'no-categories' ELSE 'ok' END
 FROM _classified
 WHERE exempt_kind IS NULL
   AND (description IS NULL OR description = ''
        OR len(examples) = 0
-       OR list_contains(parameters, 'col0')
+       OR list_has_any(parameters, ['col0', 'col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9', 'col10', 'col11', 'col12', 'col13', 'col14', 'col15', 'col16', 'col17', 'col18', 'col19', 'col20', 'col21', 'col22', 'col23', 'col24', 'col25', 'col26', 'col27', 'col28', 'col29', 'col30', 'col31', 'col32', 'col33', 'col34', 'col35', 'col36', 'col37', 'col38', 'col39'])
        OR len(categories) = 0)
 ORDER BY function_name;
 
@@ -270,7 +282,7 @@ echo "| **eligible** | **${ELIGIBLE}** | |"
 echo "| with description | ${DESCRIBED} | $(pct "$DESCRIBED" "$ELIGIBLE") |"
 echo "| with examples | ${EXAMPLES} | $(pct "$EXAMPLES" "$ELIGIBLE") |"
 echo "| with categories | ${CATEGORIES} | $(pct "$CATEGORIES" "$ELIGIBLE") |"
-echo "| placeholder \`col0\` params | ${COL0} | |"
+echo "| placeholder \`colN\` params | ${COL0} | |"
 
 if [[ "$CHECK_EXAMPLES" == "1" ]]; then
     echo "| examples checked | ${EX_TOTAL} | ${EX_BAD} failed |"
