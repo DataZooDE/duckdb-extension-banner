@@ -156,7 +156,7 @@ WHERE (function_name, function_type) NOT IN (SELECT * FROM _before);
 -- Exemption matching. 'match' is a glob so a family can be covered by one entry.
 CREATE TEMP TABLE _classified AS
 SELECT o.*,
-       (SELECT min(e.kind) FROM _exempt e WHERE o.function_name LIKE replace(e.match, '*', '%')) AS exempt_kind
+       (SELECT min(e.kind) FROM _exempt e WHERE o.function_name GLOB e.match) AS exempt_kind
 FROM _own o;
 
 -- An unexpected autoload means the preload list above is out of date and the
@@ -171,7 +171,7 @@ HAVING count(*) > 0;
 -- Exemptions that match nothing are stale: the code they described is gone.
 SELECT '::STALE_EXEMPTION::' || e.match
 FROM _exempt e
-WHERE NOT EXISTS (SELECT 1 FROM _own o WHERE o.function_name LIKE replace(e.match, '*', '%'));
+WHERE NOT EXISTS (SELECT 1 FROM _own o WHERE o.function_name GLOB e.match);
 
 SELECT '::INVALID_KIND::' || e.match || ' (' || coalesce(e.kind, '<null>') || ')'
 FROM _exempt e
