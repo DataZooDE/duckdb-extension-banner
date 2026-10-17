@@ -36,11 +36,21 @@ option(DATAZOO_BANNER_TELEMETRY "Emit a banner_shown event via posthog-telemetry
 set(DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR "" CACHE PATH
     "Directory containing telemetry.hpp; needed only with DATAZOO_BANNER_TELEMETRY=ON")
 
+# The telemetry target the banner reports through. Consumers switch the flag on
+# unconditionally but add this target only when its dependencies (OpenSSL) were
+# found - often after this subdirectory. So the flag only takes effect when the
+# target exists at generate time; without it the banner compiles without
+# telemetry instead of failing to find telemetry.hpp or its symbols.
+set(DATAZOO_BANNER_TELEMETRY_TARGET "posthog_telemetry" CACHE STRING
+    "Target that provides PostHogTelemetry; telemetry is compiled in only if it exists")
+
 if(DATAZOO_BANNER_TELEMETRY)
-    target_compile_definitions(datazoo_banner INTERFACE DATAZOO_BANNER_TELEMETRY)
+    set(_datazoo_banner_has_telemetry "$<TARGET_EXISTS:${DATAZOO_BANNER_TELEMETRY_TARGET}>")
+    target_compile_definitions(datazoo_banner INTERFACE
+        "$<${_datazoo_banner_has_telemetry}:DATAZOO_BANNER_TELEMETRY>")
     if(DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR)
         target_include_directories(datazoo_banner INTERFACE
-            ${DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR})
+            "$<${_datazoo_banner_has_telemetry}:${DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR}>")
     endif()
 endif()
 
