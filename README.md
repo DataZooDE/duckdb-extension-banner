@@ -103,6 +103,12 @@ Building with `-DDATAZOO_BANNER_TELEMETRY=ON` emits a
 rides the extension's existing telemetry consent: if the user disabled telemetry, nothing is sent.
 Without the flag the code is compiled out entirely.
 
+The flag only takes effect when the `posthog_telemetry` target exists at generate time (it may be
+added after the banner). Extensions can therefore switch it on unconditionally: in a build that
+skips telemetry, for example a local build without OpenSSL, the banner compiles without it
+instead of failing on a missing `telemetry.hpp` or on unresolved `PostHogTelemetry` symbols. Set
+`DATAZOO_BANNER_TELEMETRY_TARGET` if the telemetry target has another name.
+
 `telemetry.hpp` has to be reachable from the translation units that include the banner header. Many
 repos link `posthog_telemetry` as `PRIVATE`, in which case its include path does *not* reach them —
 point `DATAZOO_BANNER_TELEMETRY_INCLUDE_DIR` at the directory instead:
