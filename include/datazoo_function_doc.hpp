@@ -30,6 +30,8 @@
 // nothing and costs a link error.
 
 #include "duckdb/catalog/catalog.hpp"
+#include <type_traits>
+#include <utility>
 #include "duckdb/catalog/default/default_functions.hpp"
 #include "duckdb/catalog/default/default_table_functions.hpp"
 #include "duckdb/function/function_set.hpp"
@@ -178,24 +180,49 @@ struct InfoFor<duckdb::TableFunctionSet> {
 	using type = duckdb::CreateTableFunctionInfo;
 };
 
+//! Names are std::string before DuckDB 2.0 and duckdb::Identifier (explicit conversions
+//! both ways) from 2.0 on. Constructing the field's own type and casting to
+//! const string & compile on every line, so no version checks are needed.
+template <class FIELD>
+inline void AssignName(FIELD &field, const string &n) {
+	field = FIELD(n);
+}
+template <class NAME>
+inline string NameString(const NAME &name) {
+	return string(static_cast<const string &>(name));
+}
+//! The name type a function set is constructed from (string, or Identifier on 2.0).
+using SetName = typename std::decay<decltype(std::declval<duckdb::PragmaFunctionSet &>().name)>::type;
+
+//! Overloads are held by value before 2.0 and as shared_ptr<const F> from 2.0 on, where
+//! ApplyToFunctions is the way to change them.
+template <class SET, class F>
+inline auto ForEachOverload(SET &s, F &&f, int) -> decltype(s.ApplyToFunctions(f), void()) {
+	s.ApplyToFunctions(f);
+}
+template <class SET, class F>
+inline void ForEachOverload(SET &s, F &&f, long) {
+	for (auto &fun : s.functions) {
+		f(fun);
+	}
+}
+
 inline void RenameTo(duckdb::ScalarFunction &f, const string &n) {
-	f.name = n;
+	AssignName(f.name, n);
 }
 inline void RenameTo(duckdb::AggregateFunction &f, const string &n) {
-	f.name = n;
+	AssignName(f.name, n);
 }
 inline void RenameTo(duckdb::TableFunction &f, const string &n) {
-	f.name = n;
+	AssignName(f.name, n);
 }
 
 //! A set carries the name twice -- on the set and on every overload inside it -- and
 //! both have to move, or the catalog entry and its functions disagree.
 template <class SET>
 inline void RenameSetTo(SET &s, const string &n) {
-	s.name = n;
-	for (auto &f : s.functions) {
-		f.name = n;
-	}
+	AssignName(s.name, n);
+	ForEachOverload(s, [&](auto &f) { AssignName(f.name, n); }, 0);
 }
 inline void RenameTo(duckdb::ScalarFunctionSet &s, const string &n) {
 	RenameSetTo(s, n);
@@ -309,15 +336,15 @@ public:
 	//! pragmas take named parameters only, and those must NOT set Params().
 	void RegisterPragma(duckdb::PragmaFunction pragma, Docs docs,
 	                    duckdb::OnCreateConflict on_conflict = duckdb::OnCreateConflict::ERROR_ON_CONFLICT) {
-		auto name = pragma.name;
-		duckdb::PragmaFunctionSet set(name);
+		auto name = NameString(pragma.name);
+		duckdb::PragmaFunctionSet set {SetName(name)};
 		set.AddFunction(std::move(pragma));
 		RegisterPragmaSet(std::move(name), std::move(set), std::move(docs), on_conflict);
 	}
 
 	void RegisterPragmaSet(string name, duckdb::PragmaFunctionSet set, Docs docs,
 	                       duckdb::OnCreateConflict on_conflict = duckdb::OnCreateConflict::ERROR_ON_CONFLICT) {
-		duckdb::CreatePragmaFunctionInfo info(std::move(name), std::move(set));
+		duckdb::CreatePragmaFunctionInfo info {SetName(name), std::move(set)};
 		info.descriptions = ApplyDefaults(std::move(docs));
 		info.on_conflict = on_conflict;
 
