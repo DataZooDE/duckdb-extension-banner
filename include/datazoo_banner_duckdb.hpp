@@ -37,6 +37,22 @@ inline bool ShouldAnnotate(duckdb::ExceptionType type) {
 	case duckdb::ExceptionType::FATAL:
 	case duckdb::ExceptionType::OUT_OF_MEMORY:
 		return false;
+	// The user's own mistake, and the message says what to change: a NULL or
+	// malformed argument, a missing permission, a bad setting, a name that
+	// does not bind. "Unexpected? Please report it" on those reads as "this
+	// is a bug" -- exploratory testing found it on every refusal the
+	// extensions are designed to make. Unexpected failures (I/O, HTTP,
+	// internal) keep the hint.
+	case duckdb::ExceptionType::INVALID_INPUT:
+	case duckdb::ExceptionType::PERMISSION:
+	case duckdb::ExceptionType::INVALID_CONFIGURATION:
+	case duckdb::ExceptionType::BINDER:
+	case duckdb::ExceptionType::PARSER:
+	case duckdb::ExceptionType::SYNTAX:
+	case duckdb::ExceptionType::CATALOG:
+	case duckdb::ExceptionType::CONVERSION:
+	case duckdb::ExceptionType::OUT_OF_RANGE:
+		return false;
 	default:
 		return true;
 	}
