@@ -38,6 +38,11 @@ And when the extension raises an error, the message ends with:
 -> Unexpected? Please report it: https://github.com/DataZooDE/erpl-tunnel/issues
 ```
 
+Only on errors that may be ours -- I/O, HTTP, internal. A user's own mistake whose message
+already says what to change (invalid input, a missing permission, a bad setting, a binder,
+parser or conversion error) is left alone: a "please report it" there reads as "this is a
+bug".
+
 ## Why it is quiet by default
 
 A banner that shows up in a pipeline, a notebook or a CI log is a bug, not marketing. DuckDB has no
