@@ -285,6 +285,60 @@ inline std::string WithIssueHint(const std::string &message, const BannerInfo &i
 	return message + hint;
 }
 
+// The error categories that are the user's own mistake (or the environment's),
+// keyed by DuckDB's exception type *name* -- the string
+// duckdb::Exception::ExceptionTypeToString returns, which is also the prefix of
+// the rendered message ("Invalid Input Error: ..."). Keyed by name rather than
+// by the enum so this header stays DuckDB-agnostic and the Rust crate can carry
+// the identical list (rust/datazoo-banner, `is_user_error_type`).
+//
+// A "please report it" on these reads as "this is a bug" when the message
+// already says what to change: a NULL or malformed argument, a violated
+// constraint, a name that does not bind, an unsupported feature, a write-write
+// conflict, a missing file or a 404. Anything not listed -- INTERNAL, FATAL,
+// and every type we do not recognise (a plain std::exception included) --
+// may be ours and keeps the hint.
+inline bool IsUserErrorType(const std::string &type_name) {
+	static const char *const kUserErrorTypes[] = {
+	    "Invalid Input",      "Constraint", "Binder",       "Catalog",
+	    "Not implemented",    "TransactionContext",         "Conversion",
+	    "Out of Range",       "Parser",     "Permission",   "IO",
+	    "HTTP",               "Invalid Configuration",      "Syntax"};
+	for (const char *candidate : kUserErrorTypes) {
+		const size_t len = std::strlen(candidate);
+		if (type_name.size() != len) {
+			continue;
+		}
+		bool equal = true;
+		for (size_t i = 0; i < len && equal; i++) {
+			char a = type_name[i];
+			char b = candidate[i];
+			if (a >= 'A' && a <= 'Z') {
+				a = static_cast<char>(a - 'A' + 'a');
+			}
+			if (b >= 'A' && b <= 'Z') {
+				b = static_cast<char>(b - 'A' + 'a');
+			}
+			equal = a == b;
+		}
+		if (equal) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// WithIssueHint, but only for errors that look like bugs: a user error (see
+// IsUserErrorType) comes back unchanged. For consumers that know the error's
+// category but not through a DuckDB exception -- a Rust FFI boundary, a CLI.
+inline std::string WithIssueHintFor(const std::string &message, const std::string &type_name,
+                                    const BannerInfo &info) {
+	if (IsUserErrorType(type_name)) {
+		return message;
+	}
+	return WithIssueHint(message, info);
+}
+
 // Every gate that has nothing to do with the once-a-day stamp. Split out so the
 // stamp is only touched by callers that really are about to print.
 inline bool BannerSuppressed() {

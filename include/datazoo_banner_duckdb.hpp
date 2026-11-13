@@ -6,7 +6,9 @@
 // Two things live here:
 //   * RegisterBannerOption — exposes `SET datazoo_banner = false`.
 //   * DATAZOO_GUARD        — wraps a registered bind/init/execute function so
-//                            every error it raises carries an issue link.
+//                            every error that looks like a bug (internal,
+//                            fatal, unknown) carries an issue link; user
+//                            errors pass through unchanged.
 
 #pragma once
 
@@ -28,33 +30,29 @@ inline void OnBannerOptionSet(duckdb::ClientContext &, duckdb::SetScope, duckdb:
 	BannerEnabledFlag() = parameter.GetValue<bool>();
 }
 
-// Errors we must not touch. INTERRUPT is a user pressing Ctrl-C, FATAL means
-// the connection is already being torn down, and OUT_OF_MEMORY should not be
-// made longer by string concatenation on the way out.
+// Only errors that look like bugs get the hint. The type comes from ErrorData,
+// which parses DuckDB's JSON what() -- never from a C++ catch on the exception
+// class: on macOS type_info is compared by address, so `catch
+// (InvalidInputException &)` does not match an exception thrown from another
+// extension image, while the serialized type always survives.
 inline bool ShouldAnnotate(duckdb::ExceptionType type) {
 	switch (type) {
+	// Not ours and not a bug report either: INTERRUPT is a user pressing
+	// Ctrl-C, and OUT_OF_MEMORY should not be made longer by string
+	// concatenation on the way out.
 	case duckdb::ExceptionType::INTERRUPT:
-	case duckdb::ExceptionType::FATAL:
 	case duckdb::ExceptionType::OUT_OF_MEMORY:
 		return false;
-	// The user's own mistake, and the message says what to change: a NULL or
-	// malformed argument, a missing permission, a bad setting, a name that
-	// does not bind. "Unexpected? Please report it" on those reads as "this
-	// is a bug" -- exploratory testing found it on every refusal the
-	// extensions are designed to make. Unexpected failures (I/O, HTTP,
-	// internal) keep the hint.
-	case duckdb::ExceptionType::INVALID_INPUT:
-	case duckdb::ExceptionType::PERMISSION:
-	case duckdb::ExceptionType::INVALID_CONFIGURATION:
-	case duckdb::ExceptionType::BINDER:
-	case duckdb::ExceptionType::PARSER:
-	case duckdb::ExceptionType::SYNTAX:
-	case duckdb::ExceptionType::CATALOG:
-	case duckdb::ExceptionType::CONVERSION:
-	case duckdb::ExceptionType::OUT_OF_RANGE:
-		return false;
-	default:
+	// INTERNAL and FATAL are by definition bugs; they keep the hint.
+	case duckdb::ExceptionType::INTERNAL:
+	case duckdb::ExceptionType::FATAL:
 		return true;
+	default:
+		// The user-error list lives in datazoo_banner.hpp, keyed by DuckDB's
+		// type name, so the Rust crate and non-DuckDB consumers share it.
+		// Anything not on it -- including a plain std::exception, which
+		// ErrorData reports as INVALID -- keeps the hint.
+		return !IsUserErrorType(duckdb::Exception::ExceptionTypeToString(type));
 	}
 }
 

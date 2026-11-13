@@ -38,10 +38,32 @@ And when the extension raises an error, the message ends with:
 -> Unexpected? Please report it: https://github.com/DataZooDE/erpl-tunnel/issues
 ```
 
-Only on errors that may be ours -- I/O, HTTP, internal. A user's own mistake whose message
-already says what to change (invalid input, a missing permission, a bad setting, a binder,
-parser or conversion error) is left alone: a "please report it" there reads as "this is a
-bug".
+Only on errors that look like bugs: DuckDB `INTERNAL` and `FATAL` errors, and any exception
+DuckDB does not recognise (a plain `std::exception` from a dependency). A user's own mistake
+whose message already says what to change is left alone, because a "please report it" there
+reads as "this is a bug". That covers these DuckDB exception types:
+
+| No hint (user / environment error) |
+|---|
+| `INVALID_INPUT`, `CONSTRAINT`, `BINDER`, `CATALOG`, `NOT_IMPLEMENTED`, `TRANSACTION`, `CONVERSION`, `OUT_OF_RANGE`, `PARSER`, `SYNTAX`, `PERMISSION`, `INVALID_CONFIGURATION`, `IO`, `HTTP` |
+
+`INTERRUPT` (Ctrl-C) and `OUT_OF_MEMORY` are never annotated either. Every other type keeps the
+hint. The guard reads the type from DuckDB's serialized error (`ErrorData`), not from a C++
+`catch` on the exception class, because on macOS `type_info` does not match across extension
+images. The exception type itself is preserved on rethrow.
+
+The list is keyed by DuckDB's type name (`Exception::ExceptionTypeToString`) and lives in the
+DuckDB-agnostic header, so code that knows an error's category without a DuckDB exception, such as
+a CLI or a Rust FFI boundary, applies the same rule:
+
+```cpp
+datazoo::IsUserErrorType("Invalid Input");                 // true
+datazoo::WithIssueHintFor(message, "Invalid Input", BANNER); // message, unchanged
+datazoo::WithIssueHintFor(message, "INTERNAL", BANNER);      // message + hint
+```
+
+`WithIssueHint(message, BANNER)` still appends unconditionally. Both are idempotent, so nested
+guards add one footer, not two.
 
 ## Why it is quiet by default
 
@@ -137,7 +159,9 @@ cd rust/datazoo-banner && cargo test
 
 The Rust crate is footer-only — the banner itself is emitted from the C++ entry point even in the
 Rust-based extensions. Its `hint_matches_the_cpp_wording` test is what catches the two halves
-drifting apart.
+drifting apart, and `user_error_types_match_the_cpp_list` does the same for the user-error list.
+In Rust, `BANNER.with_issue_hint_for(&msg, "Invalid Input")` is the counterpart of
+`WithIssueHintFor`. Pass the type name of the DuckDB exception the C++ shim will raise.
 
 ## Consuming it
 

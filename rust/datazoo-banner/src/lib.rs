@@ -21,8 +21,50 @@
 //!     BANNER.with_issue_hint(&err.to_string())
 //! }
 //! ```
+//!
+//! Only errors that look like bugs should carry the footer. When the boundary
+//! knows which DuckDB exception the shim will raise, pass its type name and a
+//! user error (invalid input, a violated constraint, a missing file, ...) is
+//! left alone:
+//!
+//! ```
+//! # use datazoo_banner::BannerInfo;
+//! # const BANNER: BannerInfo = BannerInfo::new("x", "1", "https://github.com/DataZooDE/x");
+//! assert_eq!(BANNER.with_issue_hint_for("argument must not be NULL", "Invalid Input"),
+//!            "argument must not be NULL");
+//! assert!(BANNER.with_issue_hint_for("unreachable state", "INTERNAL").ends_with("/x/issues"));
+//! ```
 
 #![forbid(unsafe_code)]
+
+/// DuckDB exception type names (as `Exception::ExceptionTypeToString` spells
+/// them) that are the user's own mistake. Identical to the C++
+/// `IsUserErrorType` list; `user_error_types_match_the_cpp_list` pins it.
+const USER_ERROR_TYPES: &[&str] = &[
+    "Invalid Input",
+    "Constraint",
+    "Binder",
+    "Catalog",
+    "Not implemented",
+    "TransactionContext",
+    "Conversion",
+    "Out of Range",
+    "Parser",
+    "Permission",
+    "IO",
+    "HTTP",
+    "Invalid Configuration",
+    "Syntax",
+];
+
+/// True when `type_name` (a DuckDB exception type name, compared ASCII
+/// case-insensitively) is a user error, which gets no issue footer. INTERNAL,
+/// FATAL and unknown names are not user errors.
+pub fn is_user_error_type(type_name: &str) -> bool {
+    USER_ERROR_TYPES
+        .iter()
+        .any(|candidate| candidate.eq_ignore_ascii_case(type_name))
+}
 
 /// Identity of the extension raising the error. Mirrors the C++ `BannerInfo`
 /// field for field so the two halves cannot drift.
@@ -60,6 +102,16 @@ impl BannerInfo {
             return message.to_string();
         }
         format!("{}{}", message, self.issue_hint())
+    }
+
+    /// [`with_issue_hint`](Self::with_issue_hint), but only for errors that
+    /// look like bugs: a user error type (see [`is_user_error_type`]) comes
+    /// back unchanged. Mirrors the C++ `WithIssueHintFor`.
+    pub fn with_issue_hint_for(&self, message: &str, type_name: &str) -> String {
+        if is_user_error_type(type_name) {
+            return message.to_string();
+        }
+        self.with_issue_hint(message)
     }
 }
 
@@ -110,5 +162,43 @@ mod tests {
             BANNER.issue_hint(),
             "\n-> Unexpected? Please report it: https://github.com/DataZooDE/anofox-bayes/issues"
         );
+    }
+
+    #[test]
+    fn user_errors_get_no_hint() {
+        for type_name in USER_ERROR_TYPES {
+            assert_eq!(BANNER.with_issue_hint_for("bad argument", type_name), "bad argument");
+        }
+        assert!(is_user_error_type("invalid input"));
+    }
+
+    #[test]
+    fn unexpected_errors_get_the_hint() {
+        for type_name in ["INTERNAL", "FATAL", "Invalid", "Unknown Type", "", "Invalid Inputs"] {
+            assert!(!is_user_error_type(type_name), "{type_name}");
+            assert_eq!(
+                BANNER.with_issue_hint_for("boom", type_name),
+                BANNER.with_issue_hint("boom")
+            );
+        }
+    }
+
+    #[test]
+    fn with_issue_hint_for_is_idempotent() {
+        let once = BANNER.with_issue_hint_for("boom", "INTERNAL");
+        assert_eq!(BANNER.with_issue_hint_for(&once, "INTERNAL"), once);
+    }
+
+    /// Copy of the C++ list in datazoo_banner.hpp; edit both or neither.
+    #[test]
+    fn user_error_types_match_the_cpp_list() {
+        let header = include_str!("../../../include/datazoo_banner.hpp");
+        let start = header.find("kUserErrorTypes[] = {").expect("C++ list");
+        let end = start + header[start..].find("};").unwrap();
+        let mut cpp: Vec<&str> = header[start..end].split('"').skip(1).step_by(2).collect();
+        let mut rust = USER_ERROR_TYPES.to_vec();
+        cpp.sort_unstable();
+        rust.sort_unstable();
+        assert_eq!(cpp, rust);
     }
 }
