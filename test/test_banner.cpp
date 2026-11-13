@@ -79,6 +79,32 @@ void TestIssueHintIsIdempotent() {
 	      "existing issue reference suppresses the hint");
 }
 
+void TestHintOnlyOnUnexpectedErrors() {
+	// User errors: the message already says what to change, no hint.
+	const char *user[] = {"Invalid Input", "Constraint", "Binder", "Catalog", "Not implemented",
+	                      "TransactionContext", "Conversion", "Out of Range", "Parser",
+	                      "Permission", "IO", "HTTP", "Invalid Configuration", "Syntax"};
+	for (const char *type : user) {
+		Check(datazoo::IsUserErrorType(type), (std::string("user error type: ") + type).c_str());
+		Check(datazoo::WithIssueHintFor("bad argument", type, kInfo) == "bad argument",
+		      (std::string("no hint on user error: ") + type).c_str());
+	}
+	Check(datazoo::IsUserErrorType("invalid input"), "type names match case-insensitively");
+
+	// Bugs and anything we do not recognise keep the hint.
+	const char *unexpected[] = {"INTERNAL", "FATAL", "Invalid", "Unknown Type", "", "Invalid Inputs"};
+	for (const char *type : unexpected) {
+		Check(!datazoo::IsUserErrorType(type), (std::string("not a user error: ") + type).c_str());
+		Check(datazoo::WithIssueHintFor("boom", type, kInfo) == datazoo::WithIssueHint("boom", kInfo),
+		      (std::string("hint on unexpected error: ") + type).c_str());
+	}
+
+	// Idempotent like WithIssueHint: a guard nested in another adds one footer.
+	const std::string once = datazoo::WithIssueHintFor("boom", "INTERNAL", kInfo);
+	Check(datazoo::WithIssueHintFor(once, "INTERNAL", kInfo) == once,
+	      "WithIssueHintFor is idempotent");
+}
+
 void TestEnvironmentGating() {
 	ClearEnvironment();
 
@@ -216,6 +242,7 @@ void TestBoxRendering() {
 int main() {
 	TestUrls();
 	TestIssueHintIsIdempotent();
+	TestHintOnlyOnUnexpectedErrors();
 	TestEnvironmentGating();
 	TestStampFile();
 	TestBoxRendering();

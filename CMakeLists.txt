@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 
 # Version tracks the banner copy, not an ABI: bumping it means the wording or
 # the gating rules changed and consumers should re-pin the submodule.
-project(datazoo_banner VERSION 1.0.0 LANGUAGES CXX)
+project(datazoo_banner VERSION 1.1.0 LANGUAGES CXX)
 
 # INTERFACE, not STATIC: the whole library is two headers with no state that
 # needs a translation unit. Consumers get the include path and nothing to link,
